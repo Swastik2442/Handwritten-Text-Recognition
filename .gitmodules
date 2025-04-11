@@ -1,0 +1,3 @@
+[submodule "craft"]
+	path = craft
+	url = https://github.com/Swastik2442/CRAFT-pytorch.git
