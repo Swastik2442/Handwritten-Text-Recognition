@@ -37,6 +37,12 @@ class TrainCRNN:
         if not os.path.exists(self.checkpoint_dir):
             os.mkdir(self.checkpoint_dir)
 
+    def _make_checkpoint(self):
+        torch.save(
+            self.model,
+            os.path.join(self.checkpoint_dir, f"_crnn_checkpoint_{self.epoch}.pkl")
+        )
+
     def _train_step_(self, batch):
         self.model.train()
         images, targets, input_lengths, target_lengths = batch
@@ -69,15 +75,13 @@ class TrainCRNN:
                 images = images.to(self.device)
                 outputs = self.model(images)
                 decoded_preds = ctc_greedy_decoder(outputs.cpu())
+
                 print("\nSample predictions:")
                 for i in range(min(3, len(decoded_preds))):
                     print(f"Prediction: {decoded_preds[i]}, Actual: {labels[i]}")
                 print()
 
-            torch.save(
-                self.model,
-                os.path.join(self.checkpoint_dir, f"_crnn_checkpoint_{self.epoch}.pkl")
-            )
+            self._make_checkpoint()
             self.epoch += 1
 
     def start(self, save_to="weights/crnn_model.pkl", dataset='iam', **kwargs):
