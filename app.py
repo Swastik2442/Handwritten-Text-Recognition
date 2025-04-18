@@ -2,8 +2,8 @@ from tempfile import NamedTemporaryFile
 from PIL import Image
 
 import torch
-from craft.create import TextRegions
 import streamlit as st
+from craft.create import TextRegions
 
 # pylint: disable=unused-import
 from src.model import CRNN # Required for the Model to load
@@ -23,11 +23,10 @@ if uploaded_file:
     image = Image.open(uploaded_file)
     st.image(image, caption="Uploaded Image", use_container_width=True)
 
-    if st.button("Extract Text"):
-        with st.spinner("Processing..."):
-            file = NamedTemporaryFile("wb", suffix=".png", delete=False)
-            image.save(file, "png")
-            extracted_text = test_full(model, craft, file.name)
-            file.close()
-        st.subheader("📄 Extracted Text:")
-        st.code(extracted_text, language="text")
+    with st.spinner("Processing..."):
+        file = NamedTemporaryFile("wb", suffix=".png", delete=False)
+        image.save(file, "png")
+        extracted_text = test_full(model, craft, file.name)
+        file.close()
+    st.subheader("📄 Extracted Text:")
+    st.code(extracted_text, language="text")

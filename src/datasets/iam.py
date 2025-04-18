@@ -10,7 +10,7 @@ from ..config import CHAR2IDX, IMAGE_SIZE # type: ignore
 TransformFnType = Callable[[Image.Image], Image.Image]
 
 class IAMDataset(Dataset):
-    """A PyTorch Dataset for loading IAM Handwriting Dataset for Words"""
+    """A PyTorch Dataset for loading IAM Handwriting Dataset for Lines/Sentences/Words"""
 
     def __init__(self, labels_path: str, images_dir: str, transform: TransformFnType | None = None):
         self.images_dir = images_dir
@@ -19,7 +19,7 @@ class IAMDataset(Dataset):
 
     def parse_lines_txt(self, txt_path: str):
         samples = []
-        with open(txt_path, 'r') as f:
+        with open(txt_path, 'r', encoding='utf8') as f:
             for line in f:
                 if line.startswith("#"):
                     continue

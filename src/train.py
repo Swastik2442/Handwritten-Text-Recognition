@@ -9,7 +9,7 @@ from .model import CRNN, ctc_greedy_decoder, transform
 from .datasets.iam import IAMDataset, collate_fn
 
 class TrainCRNN:
-    def __init__(self, load_from: str | None = None, checkpoint_dir="weights/checkpoints"):
+    def __init__(self, load_from: str | None = None, checkpoint_dir="weights/checkpoints", batch_size=16):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         if load_from is None:
@@ -33,6 +33,7 @@ class TrainCRNN:
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.001)
 
         self.epoch = 0
+        self.batch_size = batch_size
         self.checkpoint_dir = checkpoint_dir
         if not os.path.exists(self.checkpoint_dir):
             os.mkdir(self.checkpoint_dir)
@@ -46,7 +47,10 @@ class TrainCRNN:
     def _train_step_(self, batch):
         self.model.train()
         images, targets, input_lengths, target_lengths = batch
-        images, targets, input_lengths, target_lengths = images.to(self.device), targets.to(self.device), input_lengths.to(self.device), target_lengths.to(self.device)
+        images = images.to(self.device)
+        targets = targets.to(self.device)
+        input_lengths = input_lengths.to(self.device)
+        target_lengths = target_lengths.to(self.device)
 
         outputs = self.model(images)
         outputs = outputs.permute(1, 0, 2)
@@ -85,10 +89,25 @@ class TrainCRNN:
             self.epoch += 1
 
     def start(self, save_to="weights/crnn_model.pkl", dataset='iam', **kwargs):
+        """
+        Starts training on the specified ``dataset``
+
+        Args:
+            save_to (str): Path to save the Trained Model to. Defaults to ``weights/crnn_model.pkl``.
+            dataset (``iam``): Dataset to train the Model on. Defaults to ``iam``.
+            labels_path (str | None): Path to load the Labels from. Required when ``dataset`` is ``iam``.
+            images_dir (str | None): Path to load the Images from. Required when ``dataset`` is ``iam``.
+        """
+
+        print("Setting up Dataset")
         if dataset == 'iam':
             self.dataset = IAMDataset(transform=transform, **kwargs)
-            self.loader = DataLoader(self.dataset, 16, True, collate_fn=collate_fn)
+            self.loader = DataLoader(self.dataset, self.batch_size, True, collate_fn=collate_fn)
 
         assert hasattr(self, "loader") and self.loader is not None, "Dataset not Loaded"
+        print("Starting Training...")
         self.train_model()
+
+        print("Training Completed. Saving Model...")
         torch.save(self.model, save_to)
+        print("Model Saved.")
