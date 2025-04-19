@@ -2,8 +2,8 @@ import os
 
 from torch.utils.data import Dataset
 
-from ..config import HEX2CHAR # type: ignore
-from .common import get_item, TransformFnType
+from ..config import HEX2CHAR                 # type: ignore
+from ..utils import get_item, TransformFnType # type: ignore
 
 class NISTDataset(Dataset):
     """A PyTorch Dataset for loading NIST Special Database 19"""

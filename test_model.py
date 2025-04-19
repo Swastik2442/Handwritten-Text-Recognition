@@ -1,5 +1,6 @@
 from PIL import Image
 
+import fastwer
 import torch
 import textblob
 
@@ -16,6 +17,11 @@ def get_num_params(model: torch.nn.Module, show_params=True):
         if show_params:
             print(f"{name:^50} {num_params:^10}")
     return tot_params
+
+def get_scores(actual: str, pred: str):
+    wer = fastwer.score_sent(actual, pred)
+    cer = fastwer.score_sent(actual, pred, char_level=True)
+    return wer, cer
 
 def test_model(model: CRNN, img_path: str):
     image = Image.open(img_path).convert('L')
@@ -42,9 +48,12 @@ def test_full(crnn: CRNN, craft: TextRegions, img_path: str):
     crnn.eval()
     text = ' '.join([ctc_greedy_decoder(crnn(img).cpu())[0] for img in imgs])
 
-    return textblob.TextBlob(text).correct().string
+    return textblob.TextBlob(text).correct().string, text
 
 if __name__ == '__main__':
-    model = torch.load("weights/crnn_model.pkl", map_location=device)
+    model = torch.load("weights/crnn_model_000.pkl", map_location=device, weights_only=False)
     craft = TextRegions(trained_model="weights/craft_mlt_25k.pth", show_time=False)
-    print(test_full(model, craft, "data/a01-000u.png"))
+
+    ans = test_full(model, craft, "data/a03-006-00.png")
+    label = ' '.join("Today|,|for|example|,|the|Foreign|Minister|of|Indo-".split("|"))
+    print(label, *ans, get_scores(label, ans[0]), get_scores(label, ans[1]), sep='\n')

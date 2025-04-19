@@ -1,6 +1,8 @@
 import os
+import time
 from typing import Literal
 
+import fastwer
 import torch
 from torch.utils.data import DataLoader
 
@@ -8,7 +10,7 @@ from .config import NUM_CLASSES, NUM_EPOCHS
 from .model import CRNN, ctc_greedy_decoder, transform
 from .datasets.iam import IAMWordsDataset, IAMLinesDataset
 from .datasets.nist import NISTDataset
-from .datasets.common import decode_text, collate_fn
+from .utils import to_time_string, decode_text, collate_fn
 
 class TrainCRNN:
     """Class to simplify the Training of the CRNN"""
@@ -87,13 +89,27 @@ class TrainCRNN:
         while self.epoch <= NUM_EPOCHS:
             # Training
             total_loss = 0.0
+            epoch_start = time.time_ns()
             for batch_idx, batch in enumerate(self.loader):
+                start_time = time.time_ns()
                 loss = self._train_step_(batch)
                 total_loss += loss
                 if batch_idx % 10 == 0:
-                    print(f"Epoch [{self.epoch}/{NUM_EPOCHS}], Step [{batch_idx}], Loss: {loss:.4f}")
+                    time_spent = time.time_ns() - start_time
+                    print(
+                        f"Epoch [{self.epoch}/{NUM_EPOCHS}],",
+                        f"Step [{batch_idx}],",
+                        f"{to_time_string(time_spent)}/step,",
+                        f"Loss: {loss:.4f}",
+                        end=''
+                    )
 
-            print(f"Epoch [{self.epoch}] finished with avg loss: {total_loss / len(self.loader):.4f}")
+            time_spent = time.time_ns() - epoch_start
+            print(
+                f"\nEpoch [{self.epoch}] finished with avg loss",
+                round(total_loss / len(self.loader), 4),
+                "in", to_time_string(time_spent)
+            )
 
             # Validation
             self.model.eval()
@@ -103,9 +119,14 @@ class TrainCRNN:
                 outputs = self.model(images)
                 decoded_preds = ctc_greedy_decoder(outputs.cpu())
 
+                batch_labels = [decode_text(label) for label in labels]
+                print(
+                    "WER:", fastwer.score(batch_labels, decoded_preds),
+                    "CER:", fastwer.score(batch_labels, decoded_preds, char_level=True)
+                )
                 print("\nSample predictions:")
                 for i in range(min(3, len(decoded_preds))):
-                    print(f"Prediction: {decoded_preds[i]}, Actual: {decode_text(labels[i])}")
+                    print(f"Prediction: {decoded_preds[i]}, Actual: {batch_labels[i]}")
                 print()
 
             self._make_checkpoint()

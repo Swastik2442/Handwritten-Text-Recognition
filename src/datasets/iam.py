@@ -3,7 +3,7 @@ from PIL import Image, UnidentifiedImageError
 
 from torch.utils.data import Dataset
 
-from .common import get_item, TransformFnType
+from ..utils import get_item, TransformFnType # type: ignore
 
 class IAMDataset(Dataset):
     """A PyTorch Dataset for loading IAM Handwriting Dataset for Lines/Sentences/Words"""

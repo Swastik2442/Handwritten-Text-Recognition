@@ -1,3 +1,4 @@
+fastwer @ git+https://github.com/Soul-Code/fastwer.git@a4d86d4f0d0333bf9ef9c7fba3cf5813646c5b6a
 matplotlib==3.10.1
 nltk==3.9.1
 numpy==2.2.4
