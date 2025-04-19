@@ -1,6 +1,7 @@
 from PIL import Image
 
 import torch
+import textblob
 
 from craft.create import TextRegions
 from src.model import CRNN, transform, ctc_greedy_decoder
@@ -31,15 +32,17 @@ def _polys_to_image(orig_img: Image.Image, polys):
     return img.crop((x1, y1, x3, y3))
 
 def test_full(crnn: CRNN, craft: TextRegions, img_path: str):
-    ans = craft.detectRegions(img_path)
-    ans = tuple(sorted(ans, key=lambda x: x[0][0]))
+    polys = craft.detectRegions(img_path)
+    polys = tuple(sorted(polys, key=lambda x: x[0][0]))
 
     img = Image.open(img_path).convert('L')
-    imgs = (_polys_to_image(img, poly) for poly in ans)
+    imgs = (_polys_to_image(img, poly) for poly in polys)
     imgs = (transform(img).unsqueeze(0).to(device) for img in imgs)
 
     crnn.eval()
-    return ' '.join([ctc_greedy_decoder(crnn(img).cpu())[0] for img in imgs])
+    text = ' '.join([ctc_greedy_decoder(crnn(img).cpu())[0] for img in imgs])
+
+    return textblob.TextBlob(text).correct().string
 
 if __name__ == '__main__':
     model = torch.load("weights/crnn_model.pkl", map_location=device)

@@ -1,5 +1,4 @@
 import os
-from PIL import Image, UnidentifiedImageError
 
 from torch.utils.data import Dataset
 
@@ -27,13 +26,6 @@ class NISTDataset(Dataset):
                 for file in os.listdir(subfolder_path):
                     if file.lower().endswith((".png", ".jpg", ".jpeg")):
                         img_path = os.path.join(subfolder_path, file)
-                        try:
-                            Image.open(img_path)
-                        except UnidentifiedImageError:
-                            print("Error opening ", img_path, "- removing")
-                            os.remove(img_path)
-                            continue
-
                         self.samples.append((img_path, char))
 
     def __len__(self):

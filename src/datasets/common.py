@@ -1,14 +1,19 @@
-from typing import Callable
+from typing import Callable, Sequence
 from PIL import Image
 
 import torch
 
-from ..config import CHAR2IDX, IMAGE_SIZE # type: ignore
+from ..config import CHAR2IDX, IDX2CHAR, IMAGE_SIZE # type: ignore
 
 TransformFnType = Callable[[Image.Image], Image.Image]
 
 def encode_text(text: str):
     return [CHAR2IDX.get(char, CHAR2IDX['<unk>']) for char in text]
+
+def decode_text(labels: Sequence[int]):
+    if isinstance(labels, Sequence):
+        return ' '.join(IDX2CHAR.get(char, '<unk>') for char in labels)
+    return IDX2CHAR.get(labels, '<unk>')
 
 def get_item(img_path: str, text: str, transform: TransformFnType | None = None):
     image = Image.open(img_path).convert("L")

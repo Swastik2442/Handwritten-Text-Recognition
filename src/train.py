@@ -8,7 +8,7 @@ from .config import NUM_CLASSES, NUM_EPOCHS
 from .model import CRNN, ctc_greedy_decoder, transform
 from .datasets.iam import IAMWordsDataset, IAMLinesDataset
 from .datasets.nist import NISTDataset
-from .datasets.common import collate_fn
+from .datasets.common import decode_text, collate_fn
 
 class TrainCRNN:
     """Class to simplify the Training of the CRNN"""
@@ -105,7 +105,7 @@ class TrainCRNN:
 
                 print("\nSample predictions:")
                 for i in range(min(3, len(decoded_preds))):
-                    print(f"Prediction: {decoded_preds[i]}, Actual: {labels[i]}")
+                    print(f"Prediction: {decoded_preds[i]}, Actual: {decode_text(labels[i])}")
                 print()
 
             self._make_checkpoint()
