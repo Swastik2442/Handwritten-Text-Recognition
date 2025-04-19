@@ -1,38 +1,55 @@
 import os
+from typing import Literal
 
 import torch
-import torch.nn as nn
 from torch.utils.data import DataLoader
 
 from .config import NUM_CLASSES, NUM_EPOCHS
 from .model import CRNN, ctc_greedy_decoder, transform
-from .datasets.iam import IAMDataset, collate_fn
+from .datasets.iam import IAMWordsDataset, IAMLinesDataset
+from .datasets.nist import NISTDataset
+from .datasets.common import collate_fn
 
 class TrainCRNN:
-    def __init__(self, load_from: str | None = None, checkpoint_dir="weights/checkpoints", batch_size=16):
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    """Class to simplify the Training of the CRNN"""
 
-        if load_from is None:
-            self.model = CRNN(NUM_CLASSES).to(self.device)
+    def __init__(
+        self,
+        model: CRNN | str | None = None,
+        checkpoint_dir="weights/checkpoints",
+        device: torch.device | None = None,
+        batch_size=16
+    ):
+        """
+        Parameters
+        ----------
+        model
+            Model to train for. If str is provided, tries to load the model from that path. Else creates a new Model.
+        checkpoint_dir
+            Path to save the Model Training Checkpoints to. Defaults to ``weights/checkpoints``.
+        device
+            Device to load the Model on. Uses a CUDA-compatible Device if available, otherwise the CPU.
+        batch_size
+            Batch Size to use in the Training. Defaults to 16.
+        """
+
+        if device is None:
+            self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         else:
-            torch.serialization.add_safe_globals([
-                CRNN,
-                nn.BatchNorm2d,
-                nn.Conv2d,
-                nn.Dropout,
-                nn.Linear,
-                nn.LogSoftmax,
-                nn.LSTM,
-                nn.ReLU,
-                nn.MaxPool2d,
-                nn.Sequential,
-            ])
-            self.model = torch.load(load_from, self.device)
+            self.device = device
 
-        self.criterion = nn.CTCLoss(blank=0, zero_infinity=True)
+        if model is None:
+            self.model = CRNN(NUM_CLASSES).to(self.device)
+        elif isinstance(model, str):
+            self.model = torch.load(model, self.device, weights_only=False)
+        else:
+            self.model = model
+
+        self.criterion = torch.nn.CTCLoss(blank=0, zero_infinity=True)
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.001)
+        self.loader: DataLoader | None = None
 
-        self.epoch = 0
+        self.epoch = 1
         self.batch_size = batch_size
         self.checkpoint_dir = checkpoint_dir
         if not os.path.exists(self.checkpoint_dir):
@@ -61,21 +78,27 @@ class TrainCRNN:
         return loss.item()
 
     def train_model(self):
-        while self.epoch < NUM_EPOCHS:
+        """
+        Starts the Training.
+
+        Make sure to set the ``loader`` variable before starting the Training.
+        """
+        assert self.loader is not None, "loader not set"
+        while self.epoch <= NUM_EPOCHS:
             # Training
             total_loss = 0.0
             for batch_idx, batch in enumerate(self.loader):
                 loss = self._train_step_(batch)
                 total_loss += loss
                 if batch_idx % 10 == 0:
-                    print(f"Epoch [{self.epoch + 1}/{NUM_EPOCHS}], Step [{batch_idx}], Loss: {loss:.4f}")
+                    print(f"Epoch [{self.epoch}/{NUM_EPOCHS}], Step [{batch_idx}], Loss: {loss:.4f}")
 
-            print(f"Epoch [{self.epoch + 1}] finished with avg loss: {total_loss / len(self.loader):.4f}")
+            print(f"Epoch [{self.epoch}] finished with avg loss: {total_loss / len(self.loader):.4f}")
 
             # Validation
             self.model.eval()
             with torch.no_grad():
-                images, labels, _ = next(iter(self.loader))
+                images, labels, *_ = next(iter(self.loader))
                 images = images.to(self.device)
                 outputs = self.model(images)
                 decoded_preds = ctc_greedy_decoder(outputs.cpu())
@@ -88,23 +111,36 @@ class TrainCRNN:
             self._make_checkpoint()
             self.epoch += 1
 
-    def start(self, save_to="weights/crnn_model.pkl", dataset='iam', **kwargs):
+    def start(
+        self,
+        save_to: torch.serialization.FILE_LIKE = "weights/crnn_model.pkl",
+        dataset: Literal["iamwords", "iamlines", "nist"] = 'iamwords',
+        **kwargs
+    ):
         """
-        Starts training on the specified ``dataset``
+        Starts the Training on the specified ``dataset``
 
-        Args:
-            save_to (str): Path to save the Trained Model to. Defaults to ``weights/crnn_model.pkl``.
-            dataset (``iam``): Dataset to train the Model on. Defaults to ``iam``.
-            labels_path (str | None): Path to load the Labels from. Required when ``dataset`` is ``iam``.
-            images_dir (str | None): Path to load the Images from. Required when ``dataset`` is ``iam``.
+        Parameters
+        ----------
+        save_to
+            Path to save the Trained Model to. Defaults to ``weights/crnn_model.pkl``.
+        dataset
+            Dataset to train the Model on. Defaults to ``iamwords``.
+        labels_path
+            Path to load the Labels from.
+        images_dir
+            Path to load the Images from.
         """
 
         print("Setting up Dataset")
-        if dataset == 'iam':
-            self.dataset = IAMDataset(transform=transform, **kwargs)
-            self.loader = DataLoader(self.dataset, self.batch_size, True, collate_fn=collate_fn)
+        if dataset == 'iamwords':
+            self.dataset = IAMWordsDataset(transform=transform, **kwargs)
+        elif dataset == 'iamlines':
+            self.dataset = IAMLinesDataset(transform=transform, **kwargs)
+        elif dataset == 'nist':
+            self.dataset = NISTDataset(transform=transform, **kwargs)
+        self.loader = DataLoader(self.dataset, self.batch_size, True, collate_fn=collate_fn)
 
-        assert hasattr(self, "loader") and self.loader is not None, "Dataset not Loaded"
         print("Starting Training...")
         self.train_model()
 
