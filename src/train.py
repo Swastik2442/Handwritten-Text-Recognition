@@ -97,7 +97,7 @@ class TrainCRNN:
                 if batch_idx % 10 == 0:
                     time_spent = time.time_ns() - start_time
                     print(
-                        f"Epoch [{self.epoch}/{NUM_EPOCHS}],",
+                        f"\rEpoch [{self.epoch}/{NUM_EPOCHS}],",
                         f"Step [{batch_idx}],",
                         f"{to_time_string(time_spent)}/step,",
                         f"Loss: {loss:.4f}",

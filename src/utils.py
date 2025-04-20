@@ -35,16 +35,18 @@ def collate_fn(batch):
     return images_tensor, flat_labels_tensor, input_lengths_tensor, label_lengths_tensor
 
 def to_time_string(ts: int):
-    if ts < 1000:
+    if ts < 1e+3:
         return f"{ts}ns"
-    if ts < 1_000_000:
-        return f"{ts // 1000}us"
-    if ts < 10_000_000:
-        return f"{ts // 1_000_000}ms"
-    if ts < 1_000_000_000:
-        return f"{ts // 10_000_000}s"
-    if ts < 60_000_000_000:
-        ts //= 1_000_000_000
-        return f"{ts}min{'s' if ts > 1 else ''}"
-    ts //= 60_000_000_000
-    return f"{ts}hr{'s' if ts > 1 else ''}"
+    if ts < 1e+6:
+        return f"{ts // 1e+3:.0f}us"
+    if ts < 1e+9:
+        return f"{ts // 1e+6:.0f}ms"
+    if ts < 6e+10:
+        return f"{ts // 1e+9:.0f}s"
+    if ts < 36e+11:
+        tsf = round(ts / 6e+10, 1)
+        tsf = int(tsf) if tsf == int(tsf) else tsf
+        return f"{tsf}min{'s' if tsf != 1 else ''}"
+    tsf = round(ts / 36e+11, 1)
+    tsf = int(tsf) if tsf == int(tsf) else tsf
+    return f"{tsf}hr{'s' if tsf != 1 else ''}"
