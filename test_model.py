@@ -6,7 +6,7 @@ import textblob
 
 from craft.create import TextRegions
 from refine import TextRefiner
-from src.model import CRNN, transform, ctc_greedy_decoder
+from src.model import CRNN, base_transform, ctc_greedy_decoder
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -26,7 +26,7 @@ def get_scores(actual: str, pred: str):
 
 def test_model(model: CRNN, img_path: str):
     image = Image.open(img_path).convert('L')
-    image_tensor = transform(image).unsqueeze(0).to(device)
+    image_tensor = base_transform(image).unsqueeze(0).to(device)
 
     model.eval()
     output = model(image_tensor)
@@ -44,7 +44,7 @@ def test_full(crnn: CRNN, craft: TextRegions, img_path: str):
 
     img = Image.open(img_path).convert('L')
     imgs = (_polys_to_image(img, poly) for poly in polys)
-    imgs = (transform(img).unsqueeze(0).to(device) for img in imgs)
+    imgs = (base_transform(img).unsqueeze(0).to(device) for img in imgs)
 
     crnn.eval()
     text = ' '.join([ctc_greedy_decoder(crnn(img).cpu())[0] for img in imgs])

@@ -5,7 +5,7 @@ from torchvision import transforms
 
 from .config import IDX2CHAR, IMAGE_SIZE
 
-transform = transforms.Compose([
+base_transform = transforms.Compose([
     transforms.Resize(IMAGE_SIZE),
     transforms.ToTensor()
 ])

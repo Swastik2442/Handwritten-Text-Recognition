@@ -7,7 +7,7 @@ import torch
 from torch.utils.data import DataLoader
 
 from .config import NUM_CLASSES, NUM_EPOCHS
-from .model import CRNN, ctc_greedy_decoder, transform
+from .model import CRNN, ctc_greedy_decoder, base_transform
 from .datasets.iam import IAMWordsDataset, IAMLinesDataset
 from .datasets.nist import NISTDataset
 from .utils import to_time_string, decode_text, collate_fn
@@ -167,11 +167,11 @@ class TrainCRNN:
 
         print("Setting up Dataset")
         if dataset == 'iamwords':
-            self.dataset = IAMWordsDataset(transform=transform, **kwargs)
+            self.dataset = IAMWordsDataset(base_transform=base_transform, **kwargs)
         elif dataset == 'iamlines':
-            self.dataset = IAMLinesDataset(transform=transform, **kwargs)
+            self.dataset = IAMLinesDataset(base_transform=base_transform, **kwargs)
         elif dataset == 'nist':
-            self.dataset = NISTDataset(transform=transform, **kwargs)
+            self.dataset = NISTDataset(transform=base_transform, **kwargs)
         self.loader = DataLoader(self.dataset, self.batch_size, True, collate_fn=collate_fn)
 
         print("Starting Training...")

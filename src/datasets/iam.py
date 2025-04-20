@@ -3,14 +3,16 @@ from PIL import Image, UnidentifiedImageError
 
 from torch.utils.data import Dataset
 
+from transforms import aug_transforms
 from ..utils import get_item, TransformFnType # type: ignore
 
 class IAMDataset(Dataset):
     """A PyTorch Dataset for loading IAM Handwriting Dataset for Lines/Sentences/Words"""
 
-    def __init__(self, labels_path: str, images_dir: str, transform: TransformFnType | None = None, **_):
+    def __init__(self, labels_path: str, images_dir: str, base_transform: TransformFnType | None = None, augment: bool = True, **_):
         self.images_dir = images_dir
-        self.transform = transform
+        self.base_transform = base_transform
+        self.augment = augment
         self.samples = self.parse_lines_txt(labels_path)
 
     def parse_lines_txt(self, txt_path: str):
@@ -51,7 +53,7 @@ class IAMDataset(Dataset):
         return len(self.samples)
 
     def __getitem__(self, idx: int):
-        return get_item(*self.samples[idx], self.transform)
+        return get_item(*self.samples[idx], aug_transforms if self.augment else self.base_transform)
 
 class IAMWordsDataset(IAMDataset):
     """A PyTorch Dataset for loading IAM Handwriting Dataset for Words"""
