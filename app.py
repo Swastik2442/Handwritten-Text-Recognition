@@ -5,8 +5,7 @@ import torch
 import streamlit as st
 from craft.create import TextRegions
 
-# pylint: disable=unused-import
-from src.model import CRNN # Required for the Model to load
+from src.model import CRNN # pylint: disable=unused-import
 from test_model import test_full
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -26,7 +25,7 @@ if uploaded_file:
     with st.spinner("Processing..."):
         file = NamedTemporaryFile("wb", suffix=".png", delete=False)
         image.save(file, "png")
-        extracted_text = test_full(model, craft, file.name)
+        extracted_text = test_full(model, craft, file.name)[0]
         file.close()
     st.subheader("📄 Extracted Text:")
     st.code(extracted_text, language="text")

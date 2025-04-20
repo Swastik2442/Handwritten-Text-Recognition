@@ -5,6 +5,7 @@ import torch
 import textblob
 
 from craft.create import TextRegions
+from refine import TextRefiner
 from src.model import CRNN, transform, ctc_greedy_decoder
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -47,8 +48,10 @@ def test_full(crnn: CRNN, craft: TextRegions, img_path: str):
 
     crnn.eval()
     text = ' '.join([ctc_greedy_decoder(crnn(img).cpu())[0] for img in imgs])
+    sc_text = textblob.TextBlob(text).correct().string
+    ref_text = TextRefiner().refine_text(sc_text)
 
-    return textblob.TextBlob(text).correct().string, text
+    return text, sc_text, ref_text
 
 if __name__ == '__main__':
     model = torch.load("weights/crnn_model_000.pkl", map_location=device, weights_only=False)

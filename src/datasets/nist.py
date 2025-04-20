@@ -16,7 +16,7 @@ class NISTDataset(Dataset):
             class_path = os.path.join(images_dir, class_id)
             if not os.path.isdir(class_path):
                 continue
-            char = HEX2CHAR[class_id.lower()]
+            char = HEX2CHAR.get(class_id.lower(), "#")
 
             for subfolder in os.listdir(class_path):
                 subfolder_path = os.path.join(class_path, subfolder)

@@ -20,7 +20,8 @@ class TrainCRNN:
         model: CRNN | str | None = None,
         checkpoint_dir="weights/checkpoints",
         device: torch.device | None = None,
-        batch_size=16
+        batch_size=16,
+        validation=True
     ):
         """
         Parameters
@@ -33,6 +34,8 @@ class TrainCRNN:
             Device to load the Model on. Uses a CUDA-compatible Device if available, otherwise the CPU.
         batch_size
             Batch Size to use in the Training. Defaults to 16.
+        validation
+            Whether to use a Validation Set or not. If True, uses 1 Batch as the Validation Set. Defaults to True.
         """
 
         if device is None:
@@ -53,6 +56,7 @@ class TrainCRNN:
 
         self.epoch = 1
         self.batch_size = batch_size
+        self.validation = validation
         self.checkpoint_dir = checkpoint_dir
         if not os.path.exists(self.checkpoint_dir):
             os.mkdir(self.checkpoint_dir)
@@ -73,11 +77,32 @@ class TrainCRNN:
 
         outputs = self.model(images)
         outputs = outputs.permute(1, 0, 2)
-        loss = self.criterion(outputs, targets, input_lengths, target_lengths)
+        loss: torch.Tensor = self.criterion(outputs, targets, input_lengths, target_lengths)
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
         return loss.item()
+
+    def _validation_step_(self, batch):
+        self.model.eval()
+        with torch.no_grad():
+            images, targets, input_lengths, target_lengths = batch
+            images = images.to(self.device)
+            outputs = self.model(images)
+            outputs = outputs.permute(1, 0, 2)
+            loss: torch.Tensor = self.criterion(outputs, targets, input_lengths, target_lengths)
+
+            predicted_labels = ctc_greedy_decoder(outputs.cpu())
+            actual_labels = [decode_text(label) for label in targets]
+            print(
+                f"Validation Loss: {loss.item():.4f}",
+                "WER:", fastwer.score(actual_labels, predicted_labels),
+                "CER:", fastwer.score(actual_labels, predicted_labels, char_level=True)
+            )
+            print("\nSample predictions:")
+            for i in range(min(3, len(predicted_labels))):
+                print(f"Prediction: {predicted_labels[i]}, Actual: {actual_labels[i]}")
+            print()
 
     def train_model(self):
         """
@@ -85,20 +110,23 @@ class TrainCRNN:
 
         Make sure to set the ``loader`` variable before starting the Training.
         """
+
         assert self.loader is not None, "loader not set"
+        num_batches = len(self.loader) - (self.batch_size if self.validation else 0)
+
         while self.epoch <= NUM_EPOCHS:
             # Training
             total_loss = 0.0
             epoch_start = time.time_ns()
             for batch_idx, batch in enumerate(self.loader):
-                start_time = time.time_ns()
+                batch_start = time.time_ns()
                 loss = self._train_step_(batch)
                 total_loss += loss
                 if batch_idx % 10 == 0:
-                    time_spent = time.time_ns() - start_time
+                    time_spent = time.time_ns() - batch_start
                     print(
                         f"\rEpoch [{self.epoch}/{NUM_EPOCHS}],",
-                        f"Step [{batch_idx}],",
+                        f"Step [{batch_idx}/{num_batches}],",
                         f"{to_time_string(time_spent)}/step,",
                         f"Loss: {loss:.4f}",
                         end=''
@@ -111,24 +139,8 @@ class TrainCRNN:
                 "in", to_time_string(time_spent)
             )
 
-            # Validation
-            self.model.eval()
-            with torch.no_grad():
-                images, labels, *_ = next(iter(self.loader))
-                images = images.to(self.device)
-                outputs = self.model(images)
-                decoded_preds = ctc_greedy_decoder(outputs.cpu())
-
-                batch_labels = [decode_text(label) for label in labels]
-                print(
-                    "WER:", fastwer.score(batch_labels, decoded_preds),
-                    "CER:", fastwer.score(batch_labels, decoded_preds, char_level=True)
-                )
-                print("\nSample predictions:")
-                for i in range(min(3, len(decoded_preds))):
-                    print(f"Prediction: {decoded_preds[i]}, Actual: {batch_labels[i]}")
-                print()
-
+            if self.validation:
+                self._validation_step_(next(iter(self.loader)))
             self._make_checkpoint()
             self.epoch += 1
 
