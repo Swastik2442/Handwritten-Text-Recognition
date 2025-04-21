@@ -6,7 +6,7 @@ import fastwer
 import torch
 from torch.utils.data import DataLoader
 
-from .config import NUM_CLASSES, NUM_EPOCHS
+from .config import NUM_CLASSES
 from .model import CRNN, ctc_greedy_decoder, base_transform
 from .datasets.iam import IAMWordsDataset, IAMLinesDataset
 from .datasets.nist import NISTDataset
@@ -20,6 +20,7 @@ class TrainCRNN:
         model: CRNN | str | None = None,
         checkpoint_dir="weights/checkpoints",
         device: torch.device | None = None,
+        num_epochs=25,
         batch_size=16,
         validation=True
     ):
@@ -32,6 +33,8 @@ class TrainCRNN:
             Path to save the Model Training Checkpoints to. Defaults to ``weights/checkpoints``.
         device
             Device to load the Model on. Uses a CUDA-compatible Device if available, otherwise the CPU.
+        num_epoches
+            Number of Epochs to run the Training for. Defaults to 25.
         batch_size
             Batch Size to use in the Training. Defaults to 16.
         validation
@@ -56,7 +59,9 @@ class TrainCRNN:
 
         self.train_history: list[tuple[int, int, float]] = []
         self.val_history: list[tuple[int, float, float, float]] = []
+
         self.epoch = 1
+        self.num_epochs = num_epochs
         self.batch_size = batch_size
         self.validation = validation
         self.checkpoint_dir = checkpoint_dir
@@ -102,7 +107,7 @@ class TrainCRNN:
             targets_list = targets.cpu().tolist()
 
             idx = 0
-            actual_labels = []
+            actual_labels: list[str] = []
             for tlen in target_lengths.tolist():
                 actual_labels.append(''.join(decode_text(targets_list[idx:idx+tlen])))
                 idx += tlen
@@ -110,7 +115,6 @@ class TrainCRNN:
             print("\nSample predictions:")
             for i in range(min(3, len(predicted_labels))):
                 print(f"Prediction: `{predicted_labels[i]}`, Actual: `{actual_labels[i]}`")
-            print()
 
         wer = fastwer.score(actual_labels, predicted_labels)
         cer = fastwer.score(actual_labels, predicted_labels, char_level=True)
@@ -126,7 +130,7 @@ class TrainCRNN:
         assert self.loader is not None, "loader not set"
         num_batches = len(self.loader) - (self.batch_size if self.validation else 0)
 
-        while self.epoch <= NUM_EPOCHS:
+        while self.epoch <= self.num_epochs:
             # Training
             total_loss = 0.0
             epoch_start = time.time_ns()
@@ -138,7 +142,7 @@ class TrainCRNN:
                 if batch_idx % 10 == 0:
                     time_spent = time.time_ns() - batch_start
                     print(
-                        f"\rEpoch [{self.epoch}/{NUM_EPOCHS}],",
+                        f"\rEpoch [{self.epoch}/{self.num_epochs}],",
                         f"Step [{batch_idx}/{num_batches}],",
                         f"{to_time_string(time_spent)}/step,",
                         f"Loss: {loss:.4f}",
@@ -147,7 +151,7 @@ class TrainCRNN:
 
             time_spent = time.time_ns() - epoch_start
             print(
-                f"\nEpoch [{self.epoch}/{NUM_EPOCHS}] finished with an avg loss of",
+                f"\nEpoch [{self.epoch}/{self.num_epochs}] finished with an avg loss of",
                 round(total_loss / len(self.loader), 4),
                 "in", to_time_string(time_spent)
             )
@@ -155,9 +159,14 @@ class TrainCRNN:
             if self.validation:
                 loss, wer, cer = self._validation_step_(next(iter(self.loader)))
                 self.val_history.append((self.epoch, loss, wer, cer))
-                print(f"Validation Loss: {loss:.4f}, WER: {wer:.4f}, CER: {cer:.4f}")
+                print(
+                    f"Epoch [{self.epoch}/{self.num_epochs}]",
+                    f"Validation Loss: {loss:.4f},",
+                    f"WER: {wer:.4f}, CER: {cer:.4f}"
+                )
             self._make_checkpoint()
             self.epoch += 1
+            print()
 
     def start(
         self,
