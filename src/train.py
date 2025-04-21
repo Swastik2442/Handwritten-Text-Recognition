@@ -54,6 +54,8 @@ class TrainCRNN:
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.001)
         self.loader: DataLoader | None = None
 
+        self.train_history: list[tuple[int, int, float]] = []
+        self.val_history: list[tuple[int, float, float, float]] = []
         self.epoch = 1
         self.batch_size = batch_size
         self.validation = validation
@@ -94,15 +96,14 @@ class TrainCRNN:
 
             predicted_labels = ctc_greedy_decoder(outputs.cpu())
             actual_labels = [decode_text(label) for label in targets]
-            print(
-                f"Validation Loss: {loss.item():.4f}",
-                "WER:", fastwer.score(actual_labels, predicted_labels),
-                "CER:", fastwer.score(actual_labels, predicted_labels, char_level=True)
-            )
             print("\nSample predictions:")
             for i in range(min(3, len(predicted_labels))):
                 print(f"Prediction: {predicted_labels[i]}, Actual: {actual_labels[i]}")
             print()
+
+        wer = fastwer.score(actual_labels, predicted_labels)
+        cer = fastwer.score(actual_labels, predicted_labels, char_level=True)
+        return loss.item(), wer, cer
 
     def train_model(self):
         """
@@ -122,6 +123,7 @@ class TrainCRNN:
                 batch_start = time.time_ns()
                 loss = self._train_step_(batch)
                 total_loss += loss
+                self.train_history.append((self.epoch, batch_idx, loss))
                 if batch_idx % 10 == 0:
                     time_spent = time.time_ns() - batch_start
                     print(
@@ -140,7 +142,9 @@ class TrainCRNN:
             )
 
             if self.validation:
-                self._validation_step_(next(iter(self.loader)))
+                loss, wer, cer = self._validation_step_(next(iter(self.loader)))
+                self.val_history.append((self.epoch, loss, wer, cer))
+                print(f"Validation Loss: {loss:.4f} WER: {wer} CER: {cer}")
             self._make_checkpoint()
             self.epoch += 1
 
