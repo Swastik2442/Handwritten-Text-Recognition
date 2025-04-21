@@ -3,7 +3,7 @@ from PIL import Image, UnidentifiedImageError
 
 from torch.utils.data import Dataset
 
-from transforms import aug_transforms
+from .transforms import aug_transforms
 from ..utils import get_item, TransformFnType # type: ignore
 
 class IAMDataset(Dataset):

@@ -60,13 +60,13 @@ class CRNN(nn.Module):
 
 def ctc_greedy_decoder(logits: torch.Tensor):
     argmax_preds = torch.argmax(logits, dim=2)
-    decoded = []
+    decoded: list[str] = []
     for seq in argmax_preds:
         prev = -1
         chars = []
         for idx in seq:
             if idx.item() != prev and idx.item() != 0:
-                chars.append(IDX2CHAR.get(idx.item(), ''))
+                chars.append(IDX2CHAR.get(idx.item(), "<unk>"))
             prev = idx.item()
         decoded.append(''.join(chars))
     return decoded

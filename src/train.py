@@ -69,7 +69,7 @@ class TrainCRNN:
             os.path.join(self.checkpoint_dir, f"_crnn_checkpoint_{self.epoch}.pkl")
         )
 
-    def _train_step_(self, batch):
+    def _train_step_(self, batch: tuple[torch.Tensor, ...]):
         self.model.train()
         images, targets, input_lengths, target_lengths = batch
         images = images.to(self.device)
@@ -85,20 +85,31 @@ class TrainCRNN:
         self.optimizer.step()
         return loss.item()
 
-    def _validation_step_(self, batch):
+    def _validation_step_(self, batch: tuple[torch.Tensor, ...]):
         self.model.eval()
         with torch.no_grad():
             images, targets, input_lengths, target_lengths = batch
             images = images.to(self.device)
-            outputs = self.model(images)
+            input_lengths = input_lengths.to(self.device)
+            targets = targets.to(self.device)
+            target_lengths = target_lengths.to(self.device)
+
+            outputs: torch.Tensor = self.model(images)
             outputs = outputs.permute(1, 0, 2)
             loss: torch.Tensor = self.criterion(outputs, targets, input_lengths, target_lengths)
 
             predicted_labels = ctc_greedy_decoder(outputs.cpu())
-            actual_labels = [decode_text(label) for label in targets]
+            targets_list = targets.cpu().tolist()
+
+            idx = 0
+            actual_labels = []
+            for tlen in target_lengths.tolist():
+                actual_labels.append(''.join(decode_text(targets_list[idx:idx+tlen])))
+                idx += tlen
+
             print("\nSample predictions:")
             for i in range(min(3, len(predicted_labels))):
-                print(f"Prediction: {predicted_labels[i]}, Actual: {actual_labels[i]}")
+                print(f"Prediction: `{predicted_labels[i]}`, Actual: `{actual_labels[i]}`")
             print()
 
         wer = fastwer.score(actual_labels, predicted_labels)
@@ -136,7 +147,7 @@ class TrainCRNN:
 
             time_spent = time.time_ns() - epoch_start
             print(
-                f"\nEpoch [{self.epoch}] finished with avg loss",
+                f"\nEpoch [{self.epoch}/{NUM_EPOCHS}] finished with an avg loss of",
                 round(total_loss / len(self.loader), 4),
                 "in", to_time_string(time_spent)
             )
@@ -144,7 +155,7 @@ class TrainCRNN:
             if self.validation:
                 loss, wer, cer = self._validation_step_(next(iter(self.loader)))
                 self.val_history.append((self.epoch, loss, wer, cer))
-                print(f"Validation Loss: {loss:.4f} WER: {wer} CER: {cer}")
+                print(f"Validation Loss: {loss:.4f}, WER: {wer:.4f}, CER: {cer:.4f}")
             self._make_checkpoint()
             self.epoch += 1
 
@@ -178,9 +189,9 @@ class TrainCRNN:
             self.dataset = NISTDataset(transform=base_transform, **kwargs)
         self.loader = DataLoader(self.dataset, self.batch_size, True, collate_fn=collate_fn)
 
-        print("Starting Training...")
+        print("\nStarting Training...\n")
         self.train_model()
 
-        print("Training Completed. Saving Model...")
+        print("\nTraining Completed. Saving Model...")
         torch.save(self.model, save_to)
-        print("Model Saved.")
+        print("\rModel Saved.")

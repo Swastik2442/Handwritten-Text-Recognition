@@ -12,8 +12,8 @@ def encode_text(text: str):
 
 def decode_text(labels: Sequence[int]):
     if isinstance(labels, Sequence):
-        return ' '.join(IDX2CHAR.get(char, '<unk>') for char in labels)
-    return IDX2CHAR.get(labels, '<unk>')
+        return [IDX2CHAR.get(idx, '<unk>') for idx in labels]
+    return [IDX2CHAR.get(labels, '<unk>')]
 
 def get_item(img_path: str, text: str, transform: TransformFnType | None = None):
     image = Image.open(img_path).convert("L")
