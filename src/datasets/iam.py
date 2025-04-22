@@ -9,13 +9,21 @@ from ..utils import get_item, TransformFnType # type: ignore
 class IAMDataset(Dataset):
     """A PyTorch Dataset for loading IAM Handwriting Dataset for Lines/Sentences/Words"""
 
-    def __init__(self, labels_path: str, images_dir: str, base_transform: TransformFnType | None = None, augment: bool = True, **_):
+    def __init__(
+        self,
+        labels_path: str,
+        images_dir: str,
+        base_transform: TransformFnType | None = None,
+        verify_images: bool = False,
+        augment: bool = True,
+        **_
+    ):
         self.images_dir = images_dir
         self.base_transform = base_transform
         self.augment = augment
-        self.samples = self.parse_lines_txt(labels_path)
+        self.samples = self.parse_lines_txt(labels_path, verify_images)
 
-    def parse_lines_txt(self, txt_path: str):
+    def parse_lines_txt(self, txt_path: str, verify_images=False):
         samples: list[tuple[str, str]] = []
         with open(txt_path, 'r', encoding='utf8') as f:
             for line in f:
@@ -26,15 +34,16 @@ class IAMDataset(Dataset):
                     continue
 
                 img_path = self._get_img_path_(parts)
-                try:
-                    Image.open(img_path)
-                except UnidentifiedImageError:
-                    print("Error opening ", img_path, "- removing")
-                    os.remove(img_path)
-                    continue
-                except FileNotFoundError:
-                    print("No such Image", img_path)
-                    continue
+                if verify_images:
+                    try:
+                        Image.open(img_path)
+                    except UnidentifiedImageError:
+                        print("Error opening ", img_path, "- removing")
+                        os.remove(img_path)
+                        continue
+                    except FileNotFoundError:
+                        print("No such Image", img_path)
+                        continue
 
                 label = self._get_label_(parts)
                 samples.append((img_path, label))

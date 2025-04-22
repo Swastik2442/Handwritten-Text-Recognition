@@ -46,12 +46,13 @@ class TrainCRNN:
         else:
             self.device = device
 
-        if model is None:
-            self.model = CRNN(NUM_CLASSES).to(self.device)
-        elif isinstance(model, str):
-            self.model = torch.load(model, self.device, weights_only=False)
-        else:
+        if isinstance(model, CRNN):
             self.model = model
+        else:
+            self.model = CRNN(NUM_CLASSES)
+            if isinstance(model, str):
+                self.model.load_state_dict(torch.load(model))
+        self.model = self.model.to(self.device)
 
         self.criterion = torch.nn.CTCLoss(blank=0, zero_infinity=True)
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.001)
@@ -70,8 +71,8 @@ class TrainCRNN:
 
     def _make_checkpoint(self):
         torch.save(
-            self.model,
-            os.path.join(self.checkpoint_dir, f"_crnn_checkpoint_{self.epoch}.pkl")
+            self.model.state_dict(),
+            os.path.join(self.checkpoint_dir, f"_crnn_checkpoint_{self.epoch}.pth")
         )
 
     def _train_step_(self, batch: tuple[torch.Tensor, ...]):
@@ -139,7 +140,7 @@ class TrainCRNN:
                 loss = self._train_step_(batch)
                 total_loss += loss
                 self.train_history.append((self.epoch, batch_idx, loss))
-                if batch_idx % 10 == 0:
+                if batch_idx % 5 == 0:
                     time_spent = time.time_ns() - batch_start
                     print(
                         f"\rEpoch [{self.epoch}/{self.num_epochs}],",
@@ -170,7 +171,7 @@ class TrainCRNN:
 
     def start(
         self,
-        save_to: torch.serialization.FILE_LIKE = "weights/crnn_model.pkl",
+        save_to: torch.serialization.FILE_LIKE = "weights/crnn_model.pth",
         dataset: Literal["iamwords", "iamlines", "nist"] = 'iamwords',
         **kwargs
     ):
@@ -180,13 +181,15 @@ class TrainCRNN:
         Parameters
         ----------
         save_to
-            Path to save the Trained Model to. Defaults to ``weights/crnn_model.pkl``.
+            Path to save the Trained Model to. Defaults to ``weights/crnn_model.pth``.
         dataset
             Dataset to train the Model on. Defaults to ``iamwords``.
         labels_path
             Path to load the Labels from.
         images_dir
             Path to load the Images from.
+        verify_images
+            Whether to verify and remove corrupted Images. Defaults to False.
         """
 
         print("Setting up Dataset")
@@ -202,5 +205,5 @@ class TrainCRNN:
         self.train_model()
 
         print("\nTraining Completed. Saving Model...")
-        torch.save(self.model, save_to)
+        torch.save(self.model.state_dict(), save_to)
         print("\rModel Saved.")
