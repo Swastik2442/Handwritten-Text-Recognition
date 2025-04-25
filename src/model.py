@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torchvision import transforms
 
-from .config import IDX2CHAR, IMAGE_SIZE
+from .config import IDX2CHAR, IMAGE_SIZE, NUM_CLASSES
 
 base_transform = transforms.Compose([
     transforms.Resize(IMAGE_SIZE),
@@ -13,7 +13,7 @@ base_transform = transforms.Compose([
 class CRNN(nn.Module):
     """A Convolutional Recurrent Neural Network Model for Handwritten Text Recognition"""
 
-    def __init__(self, num_of_characters: int): # 2,444,800 + num_of_characters
+    def __init__(self, num_of_characters: int = NUM_CLASSES): # 2,444,800 + num_of_characters
         super(CRNN, self).__init__()
         self.conv1 = nn.Sequential(
             nn.Conv2d(1, 32, kernel_size=3, padding=1), # 288 + 32 = 320
